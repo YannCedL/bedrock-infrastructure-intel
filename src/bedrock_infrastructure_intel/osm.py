@@ -18,3 +18,5 @@ def query_infrastructure(lat: float, lon: float, radius_m: int = 1000) -> Result
         value=f"{len(elements)} features", source="OpenStreetMap", observed_at=now,
         confidence=0.95, status=EpistemicStatus.FACT))
     return contract
+
+# added road and rail layers
