@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BEDROCK — Infrastructure & Site Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(18, 26, 43, 0.85);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-color: #f59e0b;
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            background-image: radial-gradient(circle at 10% 10%, rgba(245, 158, 11, 0.08) 0%, transparent 40%);
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .logo-title { font-size: 1.3rem; font-weight: 700; }
+        .logo-subtitle { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+
+        .search-bar {
+            display: flex;
+            gap: 0.75rem;
+            background: var(--card-bg);
+            padding: 0.5rem;
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+            max-width: 600px;
+        }
+
+        .search-bar input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-color);
+            padding: 0.5rem 1rem;
+        }
+
+        .search-bar button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1.25rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .map-wrapper {
+            flex: 1;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            min-height: 500px;
+        }
+
+        #map { width: 100%; height: 100%; min-height: 500px; }
+
+        .badge {
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">🏭</div>
+            <div>
+                <div class="logo-title">BEDROCK</div>
+                <div class="logo-subtitle">Intelligence Infrastructures & Sites OSM</div>
+            </div>
+        </div>
+        <div class="badge" id="infraBadge">OVERPASS API CONNECTED</div>
+    </header>
+
+    <div class="search-bar">
+        <input type="text" id="coordsInput" placeholder="Latitude, Longitude (ex: 48.8566, 2.3522)..." value="48.8566, 2.3522">
+        <button onclick="scannerZone()">Scanner la Zone</button>
+    </div>
+
+    <div class="map-wrapper">
+        <div id="map"></div>
+    </div>
+
+    <script>
+        let map = L.map('map').setView([48.8566, 2.3522], 13);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: 'OpenStreetMap, Overpass API'
+        }).addTo(map);
+
+        let markersGroup = L.layerGroup().addTo(map);
+
+        async function scannerZone() {
+            const raw = document.getElementById('coordsInput').value.trim();
+            const [lat, lon] = raw.split(',').map(n => parseFloat(n.trim()));
+            if (!lat || !lon) return;
+
+            map.setView([lat, lon], 14);
+            markersGroup.clearLayers();
+
+            try {
+                const response = await fetch(`/api/v1/infrastructure?lat=${lat}&lon=${lon}`);
+                const contract = await response.json();
+                const elements = contract.result.elements || [];
+
+                document.getElementById('infraBadge').textContent = `${elements.length} INFRASTRUCTURES DÉTECTÉES`;
+
+                elements.forEach(el => {
+                    const marker = L.circleMarker([el.lat, el.lon], {
+                        radius: 8,
+                        fillColor: '#f59e0b',
+                        color: '#d97706',
+                        weight: 2,
+                        fillOpacity: 0.8
+                    }).addTo(markersGroup);
+
+                    marker.bindPopup(`
+                        <div style="font-family:Inter; color:#1e293b;">
+                            <strong style="font-size:1.05rem; color:#d97706;">${el.name}</strong><br/>
+                            <span>Type: ${el.type}</span><br/>
+                            <span style="font-size:0.75rem; color:#64748b;">Coordonnées: ${el.lat}, ${el.lon}</span>
+                        </div>
+                    `);
+                });
+
+            } catch (err) {
+                alert("Erreur lors du scan d'infrastructures.");
+            }
+        }
+
+        window.onload = scannerZone;
+    </script>
+</body>
+</html>
