@@ -20,3 +20,5 @@ def query_infrastructure(lat: float, lon: float, radius_m: int = 1000) -> Result
     return contract
 
 # added road and rail layers
+
+# fixed GeoJSON coordinate order
